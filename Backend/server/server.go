@@ -16,7 +16,7 @@ func main(){
 	os.MkdirAll(storageDir,0755);
 
 mux:=http.NewServeMux()
-mux.HandleFunc("GET /api/fetchstorage",func(w http.ResponseWriter, r *http.Request) {
+mux.HandleFunc("GET /",func(w http.ResponseWriter, r *http.Request) {
 
 	
 	   _,_=  w.Write([]byte("Hello this is go "));
@@ -45,6 +45,30 @@ mux.HandleFunc("PUT /chunks/{id}",func(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println(body);
 	w.WriteHeader(http.StatusCreated);
+
+})
+
+
+mux.HandleFunc("GET /chunks/{id}",func(w http.ResponseWriter, r *http.Request) {
+	id:=r.PathValue("id");
+
+	buildPath:=storageDir + "/" + id;
+
+	
+
+	 data,err:=os.ReadFile(buildPath);
+	
+	 if err!=nil{
+		if os.IsNotExist(err){
+			http.Error(w,"chunk not found",http.StatusNotFound);
+			return;
+		}
+
+		http.Error(w,err.Error(),http.StatusInternalServerError);
+		return;
+	 }
+
+	 w.Write(data);
 
 })
 
