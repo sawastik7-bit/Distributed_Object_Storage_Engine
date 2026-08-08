@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -8,12 +9,18 @@ import (
 	"os"
 )
 
-const storageDir="./storage"
+
 
 func main(){
 
+	port:=flag.String("port","8080","The port you want to access for storage");
+	storageDir:=flag.String("storage","./storage","folder to store chunks");
 
-	os.MkdirAll(storageDir,0755);
+	flag.Parse();
+
+
+
+	os.MkdirAll(*storageDir,0755);
 
 mux:=http.NewServeMux()
 mux.HandleFunc("GET /",func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +40,7 @@ mux.HandleFunc("PUT /chunks/{id}",func(w http.ResponseWriter, r *http.Request) {
 		return;
 	}
 
-	filePath:=storageDir + "/" + id;
+	filePath:=*storageDir + "/" + id;
 
 	    err=os.WriteFile(filePath,body,0644);
 		if err!=nil{
@@ -41,7 +48,7 @@ mux.HandleFunc("PUT /chunks/{id}",func(w http.ResponseWriter, r *http.Request) {
 			return;
 		}
 
-	fmt.Printf("Received a request body : %s \n",body);
+	fmt.Printf("[node on port %s] stored chunks %s (%d bytes): \n",*port , id ,len(body));
 
 	fmt.Println(body);
 	w.WriteHeader(http.StatusCreated);
@@ -52,7 +59,7 @@ mux.HandleFunc("PUT /chunks/{id}",func(w http.ResponseWriter, r *http.Request) {
 mux.HandleFunc("GET /chunks/{id}",func(w http.ResponseWriter, r *http.Request) {
 	id:=r.PathValue("id");
 
-	buildPath:=storageDir + "/" + id;
+	buildPath:=*storageDir + "/" + id;
 
 	
 
@@ -72,7 +79,8 @@ mux.HandleFunc("GET /chunks/{id}",func(w http.ResponseWriter, r *http.Request) {
 
 })
 
-log.Fatal(http.ListenAndServe(":8080",mux));
+fmt.Printf("Node starting on port %s, storing chunks in %s \n", *port,*storageDir);
+log.Fatal(http.ListenAndServe(":"+*port,mux));
 
 
 
