@@ -15,8 +15,9 @@ func main(){
 
 	port:=flag.String("port","8080","The port you want to access for storage");
 	storageDir:=flag.String("storage","./storage","folder to store chunks");
-
 	flag.Parse();
+	
+fmt.Println("DEBUG storageDir value is:", *storageDir)
 
 
 
@@ -30,9 +31,10 @@ mux.HandleFunc("GET /",func(w http.ResponseWriter, r *http.Request) {
 })
 
 mux.HandleFunc("PUT /chunks/{id}",func(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("HERE SOMEONE MADE THE REQUEST");
 
 	id:=r.PathValue("id");
-
+ 
 	body,err:=io.ReadAll(r.Body);
 
 	if err!=nil{
@@ -75,7 +77,11 @@ mux.HandleFunc("GET /chunks/{id}",func(w http.ResponseWriter, r *http.Request) {
 		return;
 	 }
 
+	 fmt.Println("here someone made the request in the server");
+
 	 w.Write(data);
+
+	 
 
 })
 

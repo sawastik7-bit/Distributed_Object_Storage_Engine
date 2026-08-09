@@ -37,12 +37,15 @@ func main() {
 mux.HandleFunc("PUT /files/{filename}",func(w http.ResponseWriter, r *http.Request) {
  
 fileName:= r.PathValue("filename");
+fmt.Println(fileName);
 
 fmt.Println("filename detected :",fileName);
 
 
 	        data,err:=io.ReadAll(r.Body);
+			fmt.Println(data);
 			reader:=bytes.NewReader(data);
+			
 
 			chunks, err:=chunker.Split(reader);
 
