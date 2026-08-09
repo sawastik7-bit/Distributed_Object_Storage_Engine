@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+
+	"github.com/sawastik7-bit/FileStorage/chunker"
 )
 
 var nodeAddresses = []string{
@@ -32,16 +35,23 @@ func main() {
 mux.HandleFunc("PUT /files/{filename}",func(w http.ResponseWriter, r *http.Request) {
  
 	        data,err:=io.ReadAll(r.Body);
+			reader:=bytes.NewReader(data);
+
+			chunks, err:=chunker.Split(reader);
+
 			if err!=nil{
 				fmt.Println(err);
 				return;
 			}
 
-			fmt.Println(string(data))
+			
 
 			
 			
-
+fmt.Printf("Split into %d chunks\n", len(chunks))
+for _, c := range chunks {
+    fmt.Printf("  chunk %d: id=%s size=%d\n", c.Meta.Index, c.Meta.ID, c.Meta.Size)
+}
 			
 
 		w.WriteHeader(http.StatusOK);
