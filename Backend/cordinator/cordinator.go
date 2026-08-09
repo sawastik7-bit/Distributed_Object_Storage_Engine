@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/sawastik7-bit/FileStorage/chunker"
 )
@@ -27,6 +28,7 @@ var nextNodeIndex = 0
 func main() {
 
 	port:= flag.String("port","9000","coordinator port");
+	
 
 	flag.Parse();
 	mux:=http.NewServeMux();
@@ -34,6 +36,11 @@ func main() {
 
 mux.HandleFunc("PUT /files/{filename}",func(w http.ResponseWriter, r *http.Request) {
  
+fileName:= r.PathValue("filename");
+
+fmt.Println("filename detected :",fileName);
+
+
 	        data,err:=io.ReadAll(r.Body);
 			reader:=bytes.NewReader(data);
 
@@ -52,7 +59,37 @@ fmt.Printf("Split into %d chunks\n", len(chunks))
 for _, c := range chunks {
     fmt.Printf("  chunk %d: id=%s size=%d\n", c.Meta.Index, c.Meta.ID, c.Meta.Size)
 }
-			
+	client:=&http.Client{
+		Timeout: 10 * time.Second,
+	}		
+
+for i:=0;i<len(chunks);i++{
+c:=chunks[i];
+
+node:=nodeAddresses[nextNodeIndex%len(nodeAddresses)];
+nextNodeIndex++;
+
+url:=node + "/chunks/" + c.Meta.ID;
+
+req, err:=http.NewRequest(http.MethodPut,url,nil);
+
+if err!=nil{
+	http.Error(w,"Failed to create request : " + err.Error(), http.StatusInternalServerError);
+	return;
+}
+
+resp, err:= client.Do(req);
+
+if err!=nil{
+	http.Error(w,"Failed to send chunk : " + err.Error(), http.StatusInternalServerError);
+	return;
+}
+
+fmt.Println("Sent chunk", c.Meta.ID, "to", node , "-status:", resp.StatusCode);
+
+defer resp.Body.Close();
+}
+
 
 		w.WriteHeader(http.StatusOK);
 })
