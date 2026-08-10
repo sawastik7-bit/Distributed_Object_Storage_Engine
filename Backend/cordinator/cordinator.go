@@ -68,7 +68,9 @@ for _, c := range chunks {
 
 	client:=&http.Client{
 		Timeout: 10 * time.Second,
-	}		
+	}	
+	
+	 orderedChunkIDs:=[]string{};
 
 for i:=0;i<len(chunks);i++{
 c:=chunks[i];
@@ -81,6 +83,9 @@ url:=node + "/chunks/" + c.Meta.ID;
 
 req, err:=http.NewRequest(http.MethodPut,url,bytes.NewReader(c.Data));
 
+fmt.Println("sent chunk to : ",url);
+
+orderedChunkIDs= append(orderedChunkIDs,c.Meta.ID);
       chunkLocations[c.Meta.ID]=node; // mapping a specific chunk to a local host or which node its right now in 
 
 if err!=nil{
@@ -100,6 +105,7 @@ fmt.Println("Sent chunk", c.Meta.ID, "to", node , "-status:", resp.StatusCode);
 defer resp.Body.Close();
 }
 
+fileChunks[fileName] = orderedChunkIDs;
 
 		w.WriteHeader(http.StatusOK);
 })
