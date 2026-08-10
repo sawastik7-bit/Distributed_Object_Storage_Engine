@@ -74,7 +74,7 @@ nextNodeIndex++;
 
 url:=node + "/chunks/" + c.Meta.ID;
 
-req, err:=http.NewRequest(http.MethodPut,url,nil);
+req, err:=http.NewRequest(http.MethodPut,url,bytes.NewReader(c.Data));
 
 if err!=nil{
 	http.Error(w,"Failed to create request : " + err.Error(), http.StatusInternalServerError);
