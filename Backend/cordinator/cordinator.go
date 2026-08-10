@@ -18,8 +18,8 @@ var nodeAddresses = []string{
 	"http://localhost:8082",
 	"http://localhost:8083"}
 
-var fileChunks = make(map[string][]string)
-var chunkLocations = make(map[string]string)
+var fileChunks = make(map[string][]string)  // file name -> ["chunk1","chunk2","chunk3"]
+var chunkLocations = make(map[string]string) //  chunk name -> "localhost:..."
 
 var nextNodeIndex = 0
 
@@ -49,6 +49,8 @@ fmt.Println("filename detected :",fileName);
 
 			chunks, err:=chunker.Split(reader);
 
+
+
 			if err!=nil{
 				fmt.Println(err);
 				return;
@@ -62,6 +64,8 @@ fmt.Printf("Split into %d chunks\n", len(chunks))
 for _, c := range chunks {
     fmt.Printf("  chunk %d: id=%s size=%d\n", c.Meta.Index, c.Meta.ID, c.Meta.Size)
 }
+
+
 	client:=&http.Client{
 		Timeout: 10 * time.Second,
 	}		
@@ -69,12 +73,15 @@ for _, c := range chunks {
 for i:=0;i<len(chunks);i++{
 c:=chunks[i];
 
+
 node:=nodeAddresses[nextNodeIndex%len(nodeAddresses)];
 nextNodeIndex++;
 
 url:=node + "/chunks/" + c.Meta.ID;
 
 req, err:=http.NewRequest(http.MethodPut,url,bytes.NewReader(c.Data));
+
+      chunkLocations[c.Meta.ID]=node; // mapping a specific chunk to a local host or which node its right now in 
 
 if err!=nil{
 	http.Error(w,"Failed to create request : " + err.Error(), http.StatusInternalServerError);
