@@ -93,5 +93,22 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
+
+
+mux.HandleFunc("GET /files/{filename}",func(w http.ResponseWriter, r *http.Request) {
+
+	fileName:=r.PathValue("filename"); // fetching the file from the url 
+
+	fmt.Println(fileName);
+
+	w.WriteHeader(http.StatusOK);
+
+
+})
+
+
+
+
+
 	log.Fatal(http.ListenAndServe(":"+*port, mux))
 }
