@@ -28,7 +28,9 @@ func main() {
 	flag.Parse()
 
 	mux := http.NewServeMux()
+	client := &http.Client{Timeout: 10 * time.Second}
 
+	// ---------- UPLOAD ----------
 	mux.HandleFunc("PUT /files/{filename}", func(w http.ResponseWriter, r *http.Request) {
 		fileName := r.PathValue("filename")
 		fmt.Println("filename detected:", fileName)
@@ -48,7 +50,6 @@ func main() {
 
 		fmt.Printf("Split into %d chunks\n", len(chunks))
 
-		client := &http.Client{Timeout: 10 * time.Second}
 		var orderedChunkIDs []string
 
 		for i := 0; i < len(chunks); i++ {
@@ -80,7 +81,6 @@ func main() {
 			fmt.Println("Sent chunk", c.Meta.ID, "to", node, "- status:", resp.StatusCode)
 			resp.Body.Close()
 
-			
 			orderedChunkIDs = append(orderedChunkIDs, c.Meta.ID)
 			chunkLocations[c.Meta.ID] = node
 		}
@@ -93,64 +93,57 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	// ---------- DOWNLOAD ----------
+	mux.HandleFunc("GET /files/{filename}", func(w http.ResponseWriter, r *http.Request) {
+		fileName := r.PathValue("filename")
 
-
-mux.HandleFunc("GET /files/{filename}",func(w http.ResponseWriter, r *http.Request) {
-
-	fileName:=r.PathValue("filename"); // fetching the file from the url 
-
-	client:= &http.Client{
-		Timeout: 10*time.Second,
-	}
-
-	fmt.Println(fileName);
-
-
-	          chunkArr:=   fileChunks[fileName];
-
-      for i:=0;i<len(chunkArr);i++{
-
-		         port:=chunkLocations[chunkArr[i]];
-           chunkId:=chunkArr[i];
-
-				 url:=port + "/chunks/"+chunkId;
-
-				 fmt.Println("the data fetching from the url is : ", url);
-
-		req,err:=http.NewRequest(http.MethodGet,url,nil);
-		
-		if err!=nil{
-
-http.Error(w,err.Error(),http.StatusInternalServerError);
-			return;
+		chunkArr, exists := fileChunks[fileName]
+		if !exists || len(chunkArr) == 0 {
+			http.Error(w, "file not found", http.StatusNotFound)
+			return
 		}
 
-		resp, err:=client.Do(req);
+		var reassembled bytes.Buffer // grows as we append each chunk's bytes, in order
 
-		if err!=nil{
-			http.Error(w,err.Error(),http.StatusInternalServerError);
-			return;
+		for i := 0; i < len(chunkArr); i++ {
+			chunkID := chunkArr[i]
+			node, ok := chunkLocations[chunkID]
+			if !ok {
+				http.Error(w, "missing location for chunk "+chunkID, http.StatusInternalServerError)
+				return
+			}
+
+			resp, err := client.Get(node + "/chunks/" + chunkID)
+			if err != nil {
+				http.Error(w, "failed to fetch chunk: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				http.Error(w, fmt.Sprintf("node %s returned status %d for chunk %s", node, resp.StatusCode, chunkID), http.StatusInternalServerError)
+				return
+			}
+
+			chunkData, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				http.Error(w, "failed to read chunk body: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			// verify integrity before trusting the bytes
+			if !chunker.Verify(chunkData, chunkID) {
+				http.Error(w, "checksum mismatch for chunk "+chunkID, http.StatusInternalServerError)
+				return
+			}
+
+			reassembled.Write(chunkData)
+			fmt.Println("Fetched chunk", chunkID, "from", node, "-", len(chunkData), "bytes")
 		}
 
-		fmt.Println("Sent the request to the url :", url);
-				
-       fmt.Println(resp.StatusCode);
-	   fmt.Println("Received data from the url :", url, " ", resp.Body );
-
-	   w.WriteHeader(http.StatusOK);
-
-	  }
-
-
-
-	w.WriteHeader(http.StatusOK);
-
-
-})
-
-
-
-
+		w.Write(reassembled.Bytes())
+	})
 
 	log.Fatal(http.ListenAndServe(":"+*port, mux))
 }
