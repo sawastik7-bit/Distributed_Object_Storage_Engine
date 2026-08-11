@@ -99,6 +99,10 @@ mux.HandleFunc("GET /files/{filename}",func(w http.ResponseWriter, r *http.Reque
 
 	fileName:=r.PathValue("filename"); // fetching the file from the url 
 
+	client:= &http.Client{
+		Timeout: 10*time.Second,
+	}
+
 	fmt.Println(fileName);
 
 
@@ -107,9 +111,30 @@ mux.HandleFunc("GET /files/{filename}",func(w http.ResponseWriter, r *http.Reque
       for i:=0;i<len(chunkArr);i++{
 
 		         port:=chunkLocations[chunkArr[i]];
+           chunkId:=chunkArr[i];
 
-				 fmt.Println("The file chunk is located on the port :", port);
+				 url:=port + "/chunks/"+chunkId;
 
+		req,err:=http.NewRequest(http.MethodGet,url,nil);
+		
+		if err!=nil{
+
+http.Error(w,err.Error(),http.StatusInternalServerError);
+			return;
+		}
+
+		resp, err:=client.Do(req);
+
+		if err!=nil{
+			http.Error(w,err.Error(),http.StatusInternalServerError);
+			return;
+		}
+
+		fmt.Println("Sent the request to the url :", url);
+				
+       fmt.Println(resp.StatusCode);
+
+	   w.WriteHeader(http.StatusOK);
 
 	  }
 
