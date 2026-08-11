@@ -13,104 +13,85 @@ import (
 )
 
 var nodeAddresses = []string{
-
 	"http://localhost:8081",
 	"http://localhost:8082",
-	"http://localhost:8083"}
+	"http://localhost:8083",
+}
 
-var fileChunks = make(map[string][]string)  // file name -> ["chunk1","chunk2","chunk3"]
-var chunkLocations = make(map[string]string) //  chunk name -> "localhost:..."
+var fileChunks = make(map[string][]string)   // file name -> ["chunk1","chunk2","chunk3"]
+var chunkLocations = make(map[string]string) // chunk id -> node address
 
 var nextNodeIndex = 0
 
-
-
 func main() {
+	port := flag.String("port", "9000", "coordinator port")
+	flag.Parse()
 
-	port:= flag.String("port","9000","coordinator port");
-	
+	mux := http.NewServeMux()
 
-	flag.Parse();
-	mux:=http.NewServeMux();
-// first we need to build a put route here, in which we have to read a body for this 
+	mux.HandleFunc("PUT /files/{filename}", func(w http.ResponseWriter, r *http.Request) {
+		fileName := r.PathValue("filename")
+		fmt.Println("filename detected:", fileName)
 
-mux.HandleFunc("PUT /files/{filename}",func(w http.ResponseWriter, r *http.Request) {
- 
-fileName:= r.PathValue("filename");
-fmt.Println(fileName);
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-fmt.Println("filename detected :",fileName);
+		reader := bytes.NewReader(data)
+		chunks, err := chunker.Split(reader)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
+		fmt.Printf("Split into %d chunks\n", len(chunks))
 
-	        data,err:=io.ReadAll(r.Body);
-			fmt.Println(data);
-			reader:=bytes.NewReader(data);
-			
+		client := &http.Client{Timeout: 10 * time.Second}
+		var orderedChunkIDs []string
 
-			chunks, err:=chunker.Split(reader);
+		for i := 0; i < len(chunks); i++ {
+			c := chunks[i]
 
+			node := nodeAddresses[nextNodeIndex%len(nodeAddresses)]
+			nextNodeIndex++
 
+			url := node + "/chunks/" + c.Meta.ID
 
-			if err!=nil{
-				fmt.Println(err);
-				return;
+			req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(c.Data))
+			if err != nil {
+				http.Error(w, "Failed to create request: "+err.Error(), http.StatusInternalServerError)
+				return
 			}
 
-			
+			resp, err := client.Do(req)
+			if err != nil {
+				http.Error(w, "Failed to send chunk: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if resp.StatusCode != http.StatusCreated {
+				resp.Body.Close()
+				http.Error(w, fmt.Sprintf("node %s rejected chunk, status: %d", node, resp.StatusCode), http.StatusInternalServerError)
+				return
+			}
+
+			fmt.Println("Sent chunk", c.Meta.ID, "to", node, "- status:", resp.StatusCode)
+			resp.Body.Close()
 
 			
-			
-fmt.Printf("Split into %d chunks\n", len(chunks))
-for _, c := range chunks {
-    fmt.Printf("  chunk %d: id=%s size=%d\n", c.Meta.Index, c.Meta.ID, c.Meta.Size)
-}
+			orderedChunkIDs = append(orderedChunkIDs, c.Meta.ID)
+			chunkLocations[c.Meta.ID] = node
+		}
 
+		fileChunks[fileName] = orderedChunkIDs
 
-	client:=&http.Client{
-		Timeout: 10 * time.Second,
-	}	
-	
-	 orderedChunkIDs:=[]string{};
+		fmt.Println("fileChunks now:", fileChunks)
+		fmt.Println("chunkLocations now:", chunkLocations)
 
-for i:=0;i<len(chunks);i++{
-c:=chunks[i];
+		w.WriteHeader(http.StatusOK)
+	})
 
-
-node:=nodeAddresses[nextNodeIndex%len(nodeAddresses)];
-nextNodeIndex++;
-
-url:=node + "/chunks/" + c.Meta.ID;
-
-req, err:=http.NewRequest(http.MethodPut,url,bytes.NewReader(c.Data));
-
-fmt.Println("sent chunk to : ",url);
-
-orderedChunkIDs= append(orderedChunkIDs,c.Meta.ID);
-      chunkLocations[c.Meta.ID]=node; // mapping a specific chunk to a local host or which node its right now in 
-
-if err!=nil{
-	http.Error(w,"Failed to create request : " + err.Error(), http.StatusInternalServerError);
-	return;
-}
-
-resp, err:= client.Do(req);
-
-if err!=nil{
-	http.Error(w,"Failed to send chunk : " + err.Error(), http.StatusInternalServerError);
-	return;
-}
-
-fmt.Println("Sent chunk", c.Meta.ID, "to", node , "-status:", resp.StatusCode);
-
-defer resp.Body.Close();
-}
-
-fileChunks[fileName] = orderedChunkIDs;
-
-		w.WriteHeader(http.StatusOK);
-})
-
-
-	log.Fatal(http.ListenAndServe(":"+*port,mux));
-
+	log.Fatal(http.ListenAndServe(":"+*port, mux))
 }
