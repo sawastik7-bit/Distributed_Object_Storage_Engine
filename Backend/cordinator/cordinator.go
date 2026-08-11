@@ -115,6 +115,8 @@ mux.HandleFunc("GET /files/{filename}",func(w http.ResponseWriter, r *http.Reque
 
 				 url:=port + "/chunks/"+chunkId;
 
+				 fmt.Println("the data fetching from the url is : ", url);
+
 		req,err:=http.NewRequest(http.MethodGet,url,nil);
 		
 		if err!=nil{
@@ -133,6 +135,7 @@ http.Error(w,err.Error(),http.StatusInternalServerError);
 		fmt.Println("Sent the request to the url :", url);
 				
        fmt.Println(resp.StatusCode);
+	   fmt.Println("Received data from the url :", url, " ", resp.Body );
 
 	   w.WriteHeader(http.StatusOK);
 

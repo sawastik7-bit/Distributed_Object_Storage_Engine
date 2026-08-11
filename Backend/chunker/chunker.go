@@ -7,7 +7,7 @@ import (
 	"io"
 )
 
-const ChunkSize =4
+const ChunkSize =50 //changed the chunk data to 50 bytes due to excessive overload 
 
 // describes one piece of a file
 type ChunkMeta struct {
