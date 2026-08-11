@@ -7,7 +7,7 @@ import (
 	"io"
 )
 
-const ChunkSize = 4 * 1024 * 1024
+const ChunkSize =4
 
 // describes one piece of a file
 type ChunkMeta struct {

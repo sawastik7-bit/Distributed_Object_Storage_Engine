@@ -101,6 +101,20 @@ mux.HandleFunc("GET /files/{filename}",func(w http.ResponseWriter, r *http.Reque
 
 	fmt.Println(fileName);
 
+
+	          chunkArr:=   fileChunks[fileName];
+
+      for i:=0;i<len(chunkArr);i++{
+
+		         port:=chunkLocations[chunkArr[i]];
+
+				 fmt.Println("The file chunk is located on the port :", port);
+
+
+	  }
+
+
+
 	w.WriteHeader(http.StatusOK);
 
 
