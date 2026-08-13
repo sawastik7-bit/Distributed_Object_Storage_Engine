@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/sawastik7-bit/FileStorage/chunker"
@@ -17,6 +18,9 @@ var nodeAddresses = []string{
 	"http://localhost:8082",
 	"http://localhost:8083",
 }
+
+var mu sync.Mutex;
+var wg sync.WaitGroup;
 
 var fileChunks = make(map[string][]string)   // file name -> ["chunk1","chunk2","chunk3"]
 var chunkLocations = make(map[string]string) // chunk id -> node address
@@ -55,8 +59,10 @@ func main() {
 		for i := 0; i < len(chunks); i++ {
 			c := chunks[i]
 
-			node := nodeAddresses[nextNodeIndex%len(nodeAddresses)]
+			mu.Lock();
+		node := nodeAddresses[nextNodeIndex%len(nodeAddresses)]
 			nextNodeIndex++
+			mu.Unlock();
 
 			url := node + "/chunks/" + c.Meta.ID
 
@@ -81,11 +87,14 @@ func main() {
 			fmt.Println("Sent chunk", c.Meta.ID, "to", node, "- status:", resp.StatusCode)
 			resp.Body.Close()
 
+			mu.Lock();  // this is the first mutex lock so that multiple go routines might not write to same location 
 			orderedChunkIDs = append(orderedChunkIDs, c.Meta.ID)
-			chunkLocations[c.Meta.ID] = node
+			chunkLocations[c.Meta.ID] = node  // this is one map 
+			mu.Unlock();
 		}
-
-		fileChunks[fileName] = orderedChunkIDs
+mu.Lock()  // same mutex lock for the other map , to avoid overriding the place
+		fileChunks[fileName] = orderedChunkIDs // this is the second map
+		mu.Unlock(); 
 
 		fmt.Println("fileChunks now:", fileChunks)
 		fmt.Println("chunkLocations now:", chunkLocations)
