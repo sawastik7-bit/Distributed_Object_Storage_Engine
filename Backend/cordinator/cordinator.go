@@ -56,9 +56,14 @@ func main() {
 
 		var orderedChunkIDs []string
 
+		// making a channel to handle errors inside each go routine if it gets failed
+		errCh:= make(chan error, len(chunks));
 		for i := 0; i < len(chunks); i++ {
 			c := chunks[i]
 
+			wg.Add(1);
+			go func(index int,chunk chunker.Chunk){
+				defer wg.Done();
 			mu.Lock();
 		node := nodeAddresses[nextNodeIndex%len(nodeAddresses)]
 			nextNodeIndex++
@@ -91,7 +96,20 @@ func main() {
 			orderedChunkIDs = append(orderedChunkIDs, c.Meta.ID)
 			chunkLocations[c.Meta.ID] = node  // this is one map 
 			mu.Unlock();
+		}(i,c);
 		}
+
+		wg.Wait()
+
+		close(errCh)
+ // printing the total errors in go routines
+
+		for err := range errCh {
+			fmt.Println("upload error:", err)
+			http.Error(w, "one or more chunks failed to upload: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 mu.Lock()  // same mutex lock for the other map , to avoid overriding the place
 		fileChunks[fileName] = orderedChunkIDs // this is the second map
 		mu.Unlock(); 
